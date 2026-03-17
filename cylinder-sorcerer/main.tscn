@@ -2,25 +2,6 @@
 
 [ext_resource type="Script" uid="uid://dyoh4ymmxjd01" path="res://main.gd" id="1_ig7tw"]
 
-[sub_resource type="CylinderMesh" id="CylinderMesh_7dm0k"]
-
-[sub_resource type="SphereMesh" id="SphereMesh_ig7tw"]
-
 [node name="Node3D_Root" type="Node3D" unique_id=1331942341]
 script = ExtResource("1_ig7tw")
-
-[node name="Camera3D_Main" type="Camera3D" parent="." unique_id=168218942]
-transform = Transform3D(1, 0, 0, 0, 0.9557674, 0.29412377, 0, -0.29412377, 0.9557674, 0, 3.8088655, 6.952671)
-
-[node name="OmniLight3D_Key" type="OmniLight3D" parent="." unique_id=825609209]
-
-[node name="Node3D_Cylinder" type="Node3D" parent="." unique_id=295181525]
-
-[node name="MeshInstance3D_Cylinder" type="MeshInstance3D" parent="Node3D_Cylinder" unique_id=545001566]
-mesh = SubResource("CylinderMesh_7dm0k")
-
-[node name="Node3D_Skull" type="Node3D" parent="." unique_id=506733366]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5572863, 0, 0)
-
-[node name="MeshInstance3D_Skull" type="MeshInstance3D" parent="Node3D_Skull" unique_id=87135176]
-mesh = SubResource("SphereMesh_ig7tw")
+NUM_BADDIES = 4
