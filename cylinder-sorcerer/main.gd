@@ -1,6 +1,6 @@
 extends Node3D
 
-const PLAYER_SPEED = 0.07
+const PLAYER_SPEED = 0.06
 const PLAYER_RADIUS = 0.5
 const PLAYER_SIZE = 1.0
 const PLAYER_ATTACK_ROOT_MOTION = 0.20
@@ -123,6 +123,8 @@ func _process(_delta: float) -> void:
 		sword_frame = 0
 		sword_pivot.transform = Transform3D.IDENTITY
 		sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, PLAYER_SWORD_ATTACK_START_ANGLE)
+		player.pos.x += cos(player.theta) * PLAYER_ATTACK_ROOT_MOTION
+		player.pos.z -= sin(player.theta) * PLAYER_ATTACK_ROOT_MOTION
 
 	was_attacking = is_attacking
 
@@ -163,6 +165,9 @@ func _process(_delta: float) -> void:
 	player.mesh_instance.transform.origin = player.pos
 	var m1 = Basis.IDENTITY
 	player.mesh_instance.transform.basis = m1.rotated(Vector3.UP, player.theta)
+
+	var breathing_scale = 0.9 + 0.1 * abs(pow(sin(0.02 * frame), 3))
+	player.mesh_instance.scale = Vector3(breathing_scale, 1.0, breathing_scale)
 
 	sword_debug.transform.origin = Vector3.ZERO
 	sword_debug.transform.origin += sword_pivot.basis.x.normalized() * PLAYER_SWORD_LENGTH
