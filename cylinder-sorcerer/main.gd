@@ -1,56 +1,152 @@
 extends Node3D
 
-@export var NUM_BADDIES: int
+const PLAYER_SPEED = 0.23
+const PLAYER_RADIUS = 0.5
+const PLAYER_SIZE = 1.0
+const PLAYER_ATTACK_ROOT_MOTION = 0.20
 
-class Character:
-	
-	var pos: Vector3
-	var radius: float
-	var color: Color
-	var meshInstance: MeshInstance3D
-	
-	func _init(p_pos: Vector3, p_radius: float, p_color: Color):
-		self.pos = p_pos
-		self.radius = p_radius
-		self.color = p_color
-		self.meshInstance = MeshInstance3D.new()
-		self.meshInstance.mesh = BoxMesh.new()
-		var material = StandardMaterial3D.new()
-		material.albedo_color = p_color
-		material.flags_unshaded = true
-		self.meshInstance.mesh.surface_set_material(0, material)
+const PLAYER_SWORD_FRAMES = 5
+const PLAYER_SWORD_IDLE_ANGLE = 0.0 # switch to degrees
+const PLAYER_SWORD_ATTACK_START_ANGLE = -0.80
+const PLAYER_SWORD_ATTACK_ANGLE_INCREMENT = 0.50
+const PLAYER_SWORD_LENGTH = 1.1
+
+const BADDIE_COUNT = 3
+const BADDIE_SPEED = 0.05
+const BADDIE_RADIUS = 0.5
+
+const WRAP_X = 4 + 4
+const WRAP_Z = 8 + 0
+
+var was_attacking: bool
+var is_attacking: bool
+var is_moving_left: bool
+var is_moving_right: bool
+var is_moving_up: bool
+var is_moving_down: bool
+
+var frame: int
+var sword_frame: int
 
 var player: Character
 var baddie: Character
 var baddie_list: Array[Character]
+var sword_pivot: Node3D
+var sword: MeshInstance3D
 var camera: Camera3D	
 
-func _ready() -> void:
-	# create characters
-	player = Character.new(Vector3.ZERO, 1.0, Color.RED)
-	for i in NUM_BADDIES:
-			var random_position = Vector3.ZERO
-			random_position.x = randi_range(-10, 10)
-			random_position.z = randi_range(-10, 10)
-			baddie_list.append(Character.new(random_position, 1.0, Color.MAGENTA))
-			print("Adding baddie" + str(i) + " at x=" + str(random_position.x) + " z=" + str(random_position.z))
+class Character:
 	
-	# create camera
+	var pos: Vector3
+	var theta: float
+	var radius: float
+	var color: Color
+	var mesh_instance: MeshInstance3D
+	
+	func _init(p_pos: Vector3, p_radius: float, p_color: Color):
+		self.pos = p_pos
+		self.theta = 0
+		self.radius = p_radius
+		self.color = p_color
+		self.mesh_instance = MeshInstance3D.new()
+		self.mesh_instance.mesh = BoxMesh.new()
+		self.mesh_instance.mesh.size = Vector3(PLAYER_SIZE, PLAYER_SIZE, PLAYER_SIZE)
+		var material = StandardMaterial3D.new()
+		material.albedo_color = p_color
+		material.flags_unshaded = true
+		self.mesh_instance.mesh.surface_set_material(0, material)
+
+func is_overlapping(p1, r1, p2, r2):
+	return(p2.x - p1.x) * (p2.x - p1.x) + (p2.z - p1.z) * (p2.z - p1.z) < (r1 + r2) * (r1 + r2)
+
+func _ready() -> void:
+	player = Character.new(Vector3.ZERO, PLAYER_RADIUS, Color.RED)
+
+	sword_frame = PLAYER_SWORD_FRAMES
+	sword = MeshInstance3D.new()
+	sword.mesh = BoxMesh.new()
+	sword.mesh.size = Vector3(PLAYER_SWORD_LENGTH, 0.1, 0.1)
+	var material = StandardMaterial3D.new()
+	material.albedo_color = Color.WHITE
+	material.flags_unshaded = true
+	sword.mesh.surface_set_material(0, material)
+	sword_pivot = Node3D.new()
+	sword_pivot.add_child(sword)
+	player.mesh_instance.add_child(sword_pivot)
+
+	for i in BADDIE_COUNT:
+			var random_position = Vector3.ZERO
+			random_position.x = randi_range(-WRAP_X, WRAP_X)
+			random_position.z = randi_range(-WRAP_Z, WRAP_Z)
+			baddie_list.append(Character.new(random_position, BADDIE_RADIUS, Color.MAGENTA))
+	
 	camera = Camera3D.new()
+	camera.set_orthogonal(20.0, 1.0, 40.0)
 	camera.look_at_from_position(Vector3(0, 20, 0), Vector3(0, 0, 0), Vector3(0, 0, -1))
 	camera.make_current()
 	
-	# add meshes and camera to render list
-	var root = get_tree().root.get_children()[0]
-	root.add_child(player.meshInstance)
-	for i in NUM_BADDIES:
-		root.add_child(baddie_list[i].meshInstance)
+	var root = get_tree().root.get_children()[0] # Switch to Engine.get_main_loop() (as SceneTree)... or actually call get_node("Root") and pass it for the Character to attach
+	root.add_child(player.mesh_instance)
+	for i in BADDIE_COUNT:
+		root.add_child(baddie_list[i].mesh_instance)
 	root.add_child(camera)
 	
 func _process(_delta: float) -> void:
-	if (Input.is_action_just_pressed("ui_accept")):
-		player.pos.x += 1;
-	player.meshInstance.global_transform.origin = player.pos
+	frame = frame + 1
+	sword_frame = min(sword_frame + 1, PLAYER_SWORD_FRAMES)
+
+	is_attacking = Input.is_key_pressed(KEY_J)
+	if is_attacking && !was_attacking && sword_frame > PLAYER_SWORD_FRAMES:
+		sword_frame = 0
+		sword_pivot.transform = Transform3D.IDENTITY
+		sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, PLAYER_SWORD_ATTACK_START_ANGLE)
+		was_attacking = is_attacking
+
+	sword.transform.origin = Vector3(PLAYER_SWORD_LENGTH/2.0, 0.0, 0.0) # can i do this up top? or not until it is added to the scene?
+
+	if sword_frame < PLAYER_SWORD_FRAMES:
+		sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, PLAYER_SWORD_ATTACK_ANGLE_INCREMENT)
+	else:
+		sword_pivot.transform = Transform3D.IDENTITY
+		sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, PLAYER_SWORD_IDLE_ANGLE)
+
+	if sword_frame == PLAYER_SWORD_FRAMES:
+		is_moving_left = Input.is_key_pressed(KEY_A)
+		if is_moving_left:
+			player.pos.x -= PLAYER_SPEED
+			player.theta = PI
+			
+		is_moving_right = Input.is_key_pressed(KEY_D)
+		if is_moving_right:
+			player.pos.x += PLAYER_SPEED
+			player.theta = 0
+			
+		is_moving_up = Input.is_key_pressed(KEY_W)
+		if is_moving_up:
+			player.pos.z -= PLAYER_SPEED
+			player.theta = PI/2.0
+			
+		is_moving_down = Input.is_key_pressed(KEY_S)
+		if is_moving_down:
+			player.pos.z += PLAYER_SPEED
+			player.theta = -PI/2.0
+
+	player.pos.x = clamp(player.pos.x, -WRAP_X, WRAP_X)
+	player.pos.z = clamp(player.pos.z, -WRAP_Z, WRAP_Z)
+			
+	player.mesh_instance.transform.origin = player.pos
+	var m1 = Basis.IDENTITY
+	player.mesh_instance.transform.basis = m1.rotated(Vector3.UP, player.theta)
+
+	var sword_tip_pos: Vector3
+	sword_tip_pos = sword_pivot.global_transform.origin + sword_pivot.basis.x.normalized() * PLAYER_SWORD_LENGTH
+
+	var sword_tip_radius = 0.1
 	
-	for i in NUM_BADDIES:
-		baddie_list[i].meshInstance.global_transform.origin = baddie_list[i].pos
+	for i in BADDIE_COUNT:
+		var b = baddie_list[i]
+		b.pos.x += BADDIE_SPEED * sin(0.01 * frame)
+		if is_overlapping(b.pos, b.radius, sword_tip_pos, sword_tip_radius):
+			b.pos.x = 0
+			b.pos.z = 0
+		b.mesh_instance.transform.origin = b.pos
