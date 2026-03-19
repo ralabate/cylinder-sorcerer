@@ -1,23 +1,26 @@
 extends Node3D
 
-const PLAYER_SPEED = 0.12
+const PLAYER_SPEED = 0.07
 const PLAYER_RADIUS = 0.5
 const PLAYER_SIZE = 1.0
 const PLAYER_ATTACK_ROOT_MOTION = 0.20
 
-const PLAYER_SWORD_FRAMES = 13
-const PLAYER_SWORD_IDLE_ANGLE = 0.0 # switch to degrees
-const PLAYER_SWORD_ATTACK_START_ANGLE = -0.80
-const PLAYER_SWORD_ATTACK_ANGLE_INCREMENT = 0.50
-const PLAYER_SWORD_LENGTH = 1.1
+const PLAYER_SWORD_FRAMES = 12
+const PLAYER_SWORD_IDLE_ANGLE = 999999.0
+const PLAYER_SWORD_ATTACK_START_ANGLE = -PI/2.0 + 0.2
+const PLAYER_SWORD_ATTACK_ANGLE_INCREMENT = (PI - 0.2*2)/PLAYER_SWORD_FRAMES
+const PLAYER_SWORD_LENGTH = 1.2
 const PLAYER_SWORD_DEBUG_SPHERE_SIZE = 0.2
 
-const BADDIE_COUNT = 3
+const BADDIE_COUNT = 30
 const BADDIE_SPEED = 0.02
 const BADDIE_RADIUS = 0.5
+const BADDIE_HURT_FRAMES = 6
+const BADDIE_HP = 3
+const BADDIE_KNOCKBACK = 0.6
 
-const WRAP_X = 4 + 4
-const WRAP_Z = 8 + 0
+const WRAP_X = 8
+const WRAP_Z = 8
 
 var was_attacking: bool
 var is_attacking: bool
@@ -44,6 +47,9 @@ class Character:
 	var radius: float
 	var color: Color
 	var mesh_instance: MeshInstance3D
+	var hurt_frame: int
+	var hp: int
+	var seed: float
 	
 	func _init(p_pos: Vector3, p_radius: float, p_color: Color):
 		self.pos = p_pos
@@ -58,6 +64,9 @@ class Character:
 		material.albedo_color = p_color
 		material.flags_unshaded = true
 		self.mesh_instance.mesh.surface_set_material(0, material)
+		self.hurt_frame = BADDIE_HURT_FRAMES + 1
+		self.hp = BADDIE_HP
+		self.seed = randf_range(0.0, 1.0)
 
 func is_overlapping(p1, r1, p2, r2):
 	return(p2.x - p1.x) * (p2.x - p1.x) + (p2.z - p1.z) * (p2.z - p1.z) < (r1 + r2) * (r1 + r2)
@@ -157,11 +166,61 @@ func _process(_delta: float) -> void:
 
 	sword_debug.transform.origin = Vector3.ZERO
 	sword_debug.transform.origin += sword_pivot.basis.x.normalized() * PLAYER_SWORD_LENGTH
+	sword.scale = Vector3(1, 1, 1)
 	
 	for i in BADDIE_COUNT:
 		var b = baddie_list[i]
-		b.pos.x += BADDIE_SPEED * sin(0.01 * frame)
-		if is_overlapping(b.pos, b.radius, sword_debug.global_transform.origin, PLAYER_SWORD_DEBUG_SPHERE_SIZE) && sword_frame < PLAYER_SWORD_FRAMES:
-			b.pos.x = 0
-			b.pos.z = 0
+
+		if b.hp == 0:
+			continue
+
+		b.hurt_frame += 1
+
+		if b.hurt_frame > BADDIE_HURT_FRAMES && is_overlapping(b.pos, b.radius, sword_debug.global_transform.origin, PLAYER_SWORD_DEBUG_SPHERE_SIZE) && sword_frame < PLAYER_SWORD_FRAMES:
+			b.hurt_frame = 1
+			sword.scale = Vector3(randf_range(1.5, 1.9), randf_range(1.5, 2.5), randf_range(1.5, 2.5))
+			var knockback_dir: Vector3
+			knockback_dir.x = b.pos.x - player.pos.x
+			knockback_dir.z = b.pos.z - player.pos.z
+			b.pos += knockback_dir.normalized() * BADDIE_KNOCKBACK
+
+		match b.hurt_frame:
+			1:
+				b.mesh_instance.get_active_material(0).albedo_color = Color.WHITE
+				b.mesh_instance.scale = Vector3(0.8 ,0.8, 0.8)
+				b.pos.x += randf_range(-0.09, 0.09)
+				b.pos.z += randf_range(-0.09, 0.09)
+			2:
+				b.mesh_instance.get_active_material(0).albedo_color = Color.BLACK
+				b.mesh_instance.scale = Vector3(1.1, 1.1, 1.1)
+				b.pos.x += randf_range(-0.09, 0.09)
+				b.pos.z += randf_range(-0.09, 0.09)
+			3:
+				b.mesh_instance.get_active_material(0).albedo_color = Color.BLACK
+				b.mesh_instance.scale = Vector3(1.15, 1.15, 1.15)
+				b.pos.x += randf_range(-0.09, 0.09)
+				b.pos.z += randf_range(-0.09, 0.09)
+			4:
+				b.mesh_instance.get_active_material(0).albedo_color = Color.WHITE
+				b.mesh_instance.scale = Vector3(1.2, 1.2, 1.2)
+				b.pos.x += randf_range(-0.09, 0.09)
+				b.pos.z += randf_range(-0.09, 0.09)
+
+			_ when b.hurt_frame < BADDIE_HURT_FRAMES:
+				b.mesh_instance.get_active_material(0).albedo_color = Color.WHITE
+				b.mesh_instance.scale = Vector3(1, 1, 1)
+				b.pos.x += randf_range(-0.09, 0.09)
+				b.pos.z += randf_range(-0.09, 0.09)
+
+			_ when b.hurt_frame == BADDIE_HURT_FRAMES:
+				b.mesh_instance.get_active_material(0).albedo_color = Color.MAGENTA
+				b.mesh_instance.scale = Vector3(1, 1, 1)
+				b.hp -= 1
+				if b.hp == 0:
+					b.mesh_instance.hide()
+					sword_frame = PLAYER_SWORD_FRAMES
+
+		if b.hurt_frame > BADDIE_HURT_FRAMES:
+			b.pos.x += b.seed * BADDIE_SPEED * sin(0.01 * frame + b.seed)
+
 		b.mesh_instance.transform.origin = b.pos
