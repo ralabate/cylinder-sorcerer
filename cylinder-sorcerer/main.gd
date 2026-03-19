@@ -1,18 +1,19 @@
 extends Node3D
 
-const PLAYER_SPEED = 0.23
+const PLAYER_SPEED = 0.12
 const PLAYER_RADIUS = 0.5
 const PLAYER_SIZE = 1.0
 const PLAYER_ATTACK_ROOT_MOTION = 0.20
 
-const PLAYER_SWORD_FRAMES = 15
+const PLAYER_SWORD_FRAMES = 13
 const PLAYER_SWORD_IDLE_ANGLE = 0.0 # switch to degrees
 const PLAYER_SWORD_ATTACK_START_ANGLE = -0.80
 const PLAYER_SWORD_ATTACK_ANGLE_INCREMENT = 0.50
 const PLAYER_SWORD_LENGTH = 1.1
+const PLAYER_SWORD_DEBUG_SPHERE_SIZE = 0.2
 
 const BADDIE_COUNT = 3
-const BADDIE_SPEED = 0.05
+const BADDIE_SPEED = 0.02
 const BADDIE_RADIUS = 0.5
 
 const WRAP_X = 4 + 4
@@ -33,6 +34,7 @@ var baddie: Character
 var baddie_list: Array[Character]
 var sword_pivot: Node3D
 var sword: MeshInstance3D
+var sword_debug: MeshInstance3D
 var camera: Camera3D	
 
 class Character:
@@ -49,8 +51,9 @@ class Character:
 		self.radius = p_radius
 		self.color = p_color
 		self.mesh_instance = MeshInstance3D.new()
-		self.mesh_instance.mesh = BoxMesh.new()
-		self.mesh_instance.mesh.size = Vector3(PLAYER_SIZE, PLAYER_SIZE, PLAYER_SIZE)
+		self.mesh_instance.mesh = SphereMesh.new()
+		self.mesh_instance.mesh.radius = PLAYER_RADIUS
+		self.mesh_instance.mesh.height = 2.0 * PLAYER_RADIUS
 		var material = StandardMaterial3D.new()
 		material.albedo_color = p_color
 		material.flags_unshaded = true
@@ -74,6 +77,17 @@ func _ready() -> void:
 	sword_pivot.add_child(sword)
 	player.mesh_instance.add_child(sword_pivot)
 
+	sword_debug = MeshInstance3D.new()
+	sword_debug.mesh = SphereMesh.new()
+	sword_debug.mesh.height = PLAYER_SWORD_DEBUG_SPHERE_SIZE
+	sword_debug.mesh.radius = PLAYER_SWORD_DEBUG_SPHERE_SIZE * 2
+	material = StandardMaterial3D.new()
+	material.albedo_color = Color.PINK
+	material.flags_unshaded = true
+	sword_debug.mesh.surface_set_material(0, material)
+	player.mesh_instance.add_child(sword_debug)
+	sword_debug.hide()
+
 	for i in BADDIE_COUNT:
 			var random_position = Vector3.ZERO
 			random_position.x = randi_range(-WRAP_X, WRAP_X)
@@ -95,7 +109,7 @@ func _process(_delta: float) -> void:
 	frame = frame + 1
 	sword_frame = min(sword_frame + 1, PLAYER_SWORD_FRAMES)
 
-	is_attacking = Input.is_key_pressed(KEY_SPACE)
+	is_attacking = Input.is_key_pressed(KEY_J)
 	if is_attacking && !was_attacking && sword_frame >= PLAYER_SWORD_FRAMES:
 		sword_frame = 0
 		sword_pivot.transform = Transform3D.IDENTITY
@@ -107,9 +121,11 @@ func _process(_delta: float) -> void:
 
 	if sword_frame < PLAYER_SWORD_FRAMES:
 		sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, PLAYER_SWORD_ATTACK_ANGLE_INCREMENT)
+		sword.show()
 	else:
 		sword_pivot.transform = Transform3D.IDENTITY
 		sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, PLAYER_SWORD_IDLE_ANGLE)
+		sword.hide()
 
 	if sword_frame == PLAYER_SWORD_FRAMES:
 		is_moving_left = Input.is_key_pressed(KEY_A)
@@ -139,15 +155,13 @@ func _process(_delta: float) -> void:
 	var m1 = Basis.IDENTITY
 	player.mesh_instance.transform.basis = m1.rotated(Vector3.UP, player.theta)
 
-	var sword_tip_pos: Vector3
-	sword_tip_pos = sword_pivot.global_transform.origin + sword_pivot.basis.x.normalized() * PLAYER_SWORD_LENGTH
-
-	var sword_tip_radius = 0.1
+	sword_debug.transform.origin = Vector3.ZERO
+	sword_debug.transform.origin += sword_pivot.basis.x.normalized() * PLAYER_SWORD_LENGTH
 	
 	for i in BADDIE_COUNT:
 		var b = baddie_list[i]
 		b.pos.x += BADDIE_SPEED * sin(0.01 * frame)
-		if is_overlapping(b.pos, b.radius, sword_tip_pos, sword_tip_radius):
+		if is_overlapping(b.pos, b.radius, sword_debug.global_transform.origin, PLAYER_SWORD_DEBUG_SPHERE_SIZE) && sword_frame < PLAYER_SWORD_FRAMES:
 			b.pos.x = 0
 			b.pos.z = 0
 		b.mesh_instance.transform.origin = b.pos
