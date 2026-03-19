@@ -5,7 +5,7 @@ const PLAYER_RADIUS = 0.5
 const PLAYER_SIZE = 1.0
 const PLAYER_ATTACK_ROOT_MOTION = 0.20
 
-const PLAYER_SWORD_FRAMES = 5
+const PLAYER_SWORD_FRAMES = 15
 const PLAYER_SWORD_IDLE_ANGLE = 0.0 # switch to degrees
 const PLAYER_SWORD_ATTACK_START_ANGLE = -0.80
 const PLAYER_SWORD_ATTACK_ANGLE_INCREMENT = 0.50
@@ -95,12 +95,13 @@ func _process(_delta: float) -> void:
 	frame = frame + 1
 	sword_frame = min(sword_frame + 1, PLAYER_SWORD_FRAMES)
 
-	is_attacking = Input.is_key_pressed(KEY_J)
-	if is_attacking && !was_attacking && sword_frame > PLAYER_SWORD_FRAMES:
+	is_attacking = Input.is_key_pressed(KEY_SPACE)
+	if is_attacking && !was_attacking && sword_frame >= PLAYER_SWORD_FRAMES:
 		sword_frame = 0
 		sword_pivot.transform = Transform3D.IDENTITY
 		sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, PLAYER_SWORD_ATTACK_START_ANGLE)
-		was_attacking = is_attacking
+
+	was_attacking = is_attacking
 
 	sword.transform.origin = Vector3(PLAYER_SWORD_LENGTH/2.0, 0.0, 0.0) # can i do this up top? or not until it is added to the scene?
 
