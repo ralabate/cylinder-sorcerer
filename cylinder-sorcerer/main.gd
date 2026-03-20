@@ -10,7 +10,7 @@ const PLAYER_SWORD_IDLE_ANGLE = 999999.0
 const PLAYER_SWORD_ATTACK_START_ANGLE = -PI/2.0 + 0.2
 const PLAYER_SWORD_ATTACK_ANGLE_INCREMENT = (PI - 0.2*2)/PLAYER_SWORD_FRAMES
 const PLAYER_SWORD_LENGTH = 1.2
-const PLAYER_SWORD_DEBUG_SPHERE_SIZE = 0.2
+const PLAYER_SWORD_DEBUG_SPHERE_SIZE = 0.10
 
 const BADDIE_COUNT = 30
 const BADDIE_SPEED = 0.02
@@ -18,8 +18,8 @@ const BADDIE_RADIUS = 0.5
 const BADDIE_HURT_FRAMES = 12
 const BADDIE_HP = 3
 
-const WRAP_X = 8
-const WRAP_Z = 8
+const WRAP_X = 17
+const WRAP_Z = 9
 
 var was_attacking: bool
 var is_attacking: bool
@@ -50,6 +50,7 @@ class Character:
 	var hp: int
 	var seed: float
 	var knockback_dir: Vector3
+	var speed: float
 	
 	func _init(p_pos: Vector3, p_radius: float, p_color: Color):
 		self.pos = p_pos
@@ -67,6 +68,7 @@ class Character:
 		self.hurt_frame = BADDIE_HURT_FRAMES + 1
 		self.hp = BADDIE_HP
 		self.seed = randf_range(0.0, 1.0)
+		self.speed = BADDIE_SPEED
 
 func is_overlapping(p1, r1, p2, r2):
 	return(p2.x - p1.x) * (p2.x - p1.x) + (p2.z - p1.z) * (p2.z - p1.z) < (r1 + r2) * (r1 + r2)
@@ -95,7 +97,7 @@ func _ready() -> void:
 	material.flags_unshaded = true
 	sword_debug.mesh.surface_set_material(0, material)
 	player.mesh_instance.add_child(sword_debug)
-	sword_debug.hide()
+	sword_debug.visible = false
 
 	for i in BADDIE_COUNT:
 			var random_position = Vector3.ZERO
@@ -123,8 +125,9 @@ func _process(_delta: float) -> void:
 		sword_frame = 0
 		sword_pivot.transform = Transform3D.IDENTITY
 		sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, PLAYER_SWORD_ATTACK_START_ANGLE)
-		player.pos.x += cos(player.theta) * PLAYER_ATTACK_ROOT_MOTION
-		player.pos.z -= sin(player.theta) * PLAYER_ATTACK_ROOT_MOTION
+		var rand = randf_range(0.5, 1.5)
+		player.pos.x += cos(player.theta) * PLAYER_ATTACK_ROOT_MOTION * rand
+		player.pos.z -= sin(player.theta) * PLAYER_ATTACK_ROOT_MOTION * rand
 
 	was_attacking = is_attacking
 
@@ -133,6 +136,8 @@ func _process(_delta: float) -> void:
 	if sword_frame < PLAYER_SWORD_FRAMES:
 		sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, PLAYER_SWORD_ATTACK_ANGLE_INCREMENT)
 		sword.show()
+		player.pos.x += cos(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES)
+		player.pos.z -= sin(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES)
 	else:
 		sword_pivot.transform = Transform3D.IDENTITY
 		sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, PLAYER_SWORD_IDLE_ANGLE)
@@ -169,8 +174,11 @@ func _process(_delta: float) -> void:
 	var breathing_scale = 0.9 + 0.1 * abs(pow(sin(0.02 * frame), 3))
 	player.mesh_instance.scale = Vector3(breathing_scale, 1.0, breathing_scale)
 
+	if Input.is_key_pressed(KEY_H):
+		sword_debug.visible = !sword_debug.visible
+
 	sword_debug.transform.origin = Vector3.ZERO
-	sword_debug.transform.origin += sword_pivot.basis.x.normalized() * PLAYER_SWORD_LENGTH
+	sword_debug.transform.origin += sword_pivot.basis.x.normalized() * 0.8 * PLAYER_SWORD_LENGTH
 	sword.scale = Vector3(1, 1, 1)
 	
 	for i in BADDIE_COUNT:
@@ -184,6 +192,7 @@ func _process(_delta: float) -> void:
 			b.knockback_dir.z = b.pos.z - player.pos.z
 			b.knockback_dir - b.knockback_dir.normalized()
 			b.hp -= 1
+			b.speed *= -1.5
 
 		if b.hurt_frame <= BADDIE_HURT_FRAMES:
 
@@ -223,6 +232,6 @@ func _process(_delta: float) -> void:
 					pass
 
 		if b.hurt_frame > BADDIE_HURT_FRAMES:
-			b.pos.x += b.seed * BADDIE_SPEED * sin(0.01 * frame + b.seed)
+			b.pos.x += b.seed * b.speed * sin(0.01 * frame + b.seed)
 
 		b.mesh_instance.transform.origin = b.pos
