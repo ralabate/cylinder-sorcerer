@@ -18,6 +18,9 @@ const BADDIE_RADIUS = 0.7
 const BADDIE_HURT_FRAMES = 12
 const BADDIE_HP = 3
 
+const CAMERA_SHAKE_FRAMES = BADDIE_HURT_FRAMES + 3
+const CAMERA_SHAKE_AMOUNT = 0.25
+
 const WRAP_X = 17
 const WRAP_Z = 9
 
@@ -30,6 +33,8 @@ var is_moving_down: bool
 
 var frame: int
 var sword_frame: int
+var camera_shake_frame: int
+# hurt_frame in baddie struct
 
 var player: Character
 var baddie: Character
@@ -52,7 +57,7 @@ class Character:
 	var knockback_dir: Vector3
 	var speed: float
 	
-	func _init(p_pos: Vector3, p_radius: float, p_color: Color, p_hp: float):
+	func _init(p_pos: Vector3, p_radius: float, p_color: Color, p_hp: int):
 		self.pos = p_pos
 		self.theta = 0
 		self.radius = p_radius
@@ -76,7 +81,7 @@ func is_overlapping(p1, r1, p2, r2):
 func _ready() -> void:
 	player = Character.new(Vector3.ZERO, PLAYER_RADIUS, Color.DARK_OLIVE_GREEN, PLAYER_HP)
 
-	sword_frame = PLAYER_SWORD_FRAMES
+	sword_frame = PLAYER_SWORD_FRAMES + 1
 	sword = MeshInstance3D.new()
 	sword.mesh = BoxMesh.new()
 	sword.mesh.size = Vector3(PLAYER_SWORD_LENGTH, 0.1, 0.25)
@@ -109,6 +114,7 @@ func _ready() -> void:
 	camera.set_orthogonal(20.0, 1.0, 40.0)
 	camera.look_at_from_position(Vector3(0, 20, 0), Vector3(0, 0, 0), Vector3(0, 0, -1))
 	camera.make_current()
+	camera_shake_frame = CAMERA_SHAKE_FRAMES + 1
 	
 	var root = get_tree().root.get_children()[0] # Switch to Engine.get_main_loop() (as SceneTree)... or actually call get_node("Root") and pass it for the Character to attach
 	root.add_child(player.mesh_instance)
@@ -119,6 +125,7 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	frame = frame + 1
 	sword_frame = min(sword_frame + 1, PLAYER_SWORD_FRAMES)
+	camera_shake_frame += 1
 
 	is_attacking = Input.is_key_pressed(KEY_J)
 	if is_attacking && !was_attacking && sword_frame >= PLAYER_SWORD_FRAMES:
@@ -209,6 +216,8 @@ func _process(_delta: float) -> void:
 			b.knockback_dir.z = b.pos.z - player.pos.z
 			b.knockback_dir = b.knockback_dir.normalized()
 			b.hp -= 1
+			if b.hp == 0:
+				camera_shake_frame = 1
 			b.speed *= -1
 
 		if b.hurt_frame <= BADDIE_HURT_FRAMES:
@@ -266,3 +275,11 @@ func _process(_delta: float) -> void:
 			player.theta = randf_range(-PI, PI)
 			player.hp -= 1
 			
+
+	if camera_shake_frame <= CAMERA_SHAKE_FRAMES:
+		camera.transform.origin.x = randf_range(-1.0, 1.0) * CAMERA_SHAKE_AMOUNT * (1.0 - float(camera_shake_frame)/CAMERA_SHAKE_FRAMES)
+		camera.transform.origin.z = randf_range(-1.0, 1.0) * CAMERA_SHAKE_AMOUNT * (1.0 - float(camera_shake_frame)/CAMERA_SHAKE_FRAMES)
+	else:
+		camera.transform.origin.x = 0
+		camera.transform.origin.z = 0
+		
