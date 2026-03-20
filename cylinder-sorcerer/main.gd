@@ -1,22 +1,21 @@
 extends Node3D
 
-const PLAYER_SPEED = 0.06
+const PLAYER_SPEED = 0.03
 const PLAYER_RADIUS = 0.5
 const PLAYER_SIZE = 1.0
 const PLAYER_ATTACK_ROOT_MOTION = 0.20
 
-const PLAYER_SWORD_FRAMES = 12
-const PLAYER_SWORD_IDLE_ANGLE = 999999.0
+const PLAYER_SWORD_FRAMES = 11
 const PLAYER_SWORD_ATTACK_START_ANGLE = -PI/2.0 + 0.2
 const PLAYER_SWORD_ATTACK_ANGLE_INCREMENT = (PI - 0.2*2)/PLAYER_SWORD_FRAMES
 const PLAYER_SWORD_LENGTH = 1.2
-const PLAYER_SWORD_DEBUG_SPHERE_SIZE = 0.10
+const PLAYER_SWORD_DEBUG_SPHERE_SIZE = 0.15
 
-const BADDIE_COUNT = 30
+const BADDIE_COUNT = 10
 const BADDIE_SPEED = 0.02
-const BADDIE_RADIUS = 0.5
+const BADDIE_RADIUS = 0.7
 const BADDIE_HURT_FRAMES = 12
-const BADDIE_HP = 3
+const BADDIE_HP = 5
 
 const WRAP_X = 17
 const WRAP_Z = 9
@@ -59,8 +58,8 @@ class Character:
 		self.color = p_color
 		self.mesh_instance = MeshInstance3D.new()
 		self.mesh_instance.mesh = SphereMesh.new()
-		self.mesh_instance.mesh.radius = PLAYER_RADIUS
-		self.mesh_instance.mesh.height = 2.0 * PLAYER_RADIUS
+		self.mesh_instance.mesh.radius = p_radius
+		self.mesh_instance.mesh.height = 2.0 * p_radius
 		var material = StandardMaterial3D.new()
 		material.albedo_color = p_color
 		material.flags_unshaded = true
@@ -74,14 +73,14 @@ func is_overlapping(p1, r1, p2, r2):
 	return(p2.x - p1.x) * (p2.x - p1.x) + (p2.z - p1.z) * (p2.z - p1.z) < (r1 + r2) * (r1 + r2)
 
 func _ready() -> void:
-	player = Character.new(Vector3.ZERO, PLAYER_RADIUS, Color.RED)
+	player = Character.new(Vector3.ZERO, PLAYER_RADIUS, Color.DARK_OLIVE_GREEN)
 
 	sword_frame = PLAYER_SWORD_FRAMES
 	sword = MeshInstance3D.new()
 	sword.mesh = BoxMesh.new()
-	sword.mesh.size = Vector3(PLAYER_SWORD_LENGTH, 0.1, 0.1)
+	sword.mesh.size = Vector3(PLAYER_SWORD_LENGTH, 0.1, 0.25)
 	var material = StandardMaterial3D.new()
-	material.albedo_color = Color.WHITE
+	material.albedo_color = Color.YELLOW
 	material.flags_unshaded = true
 	sword.mesh.surface_set_material(0, material)
 	sword_pivot = Node3D.new()
@@ -93,7 +92,7 @@ func _ready() -> void:
 	sword_debug.mesh.height = PLAYER_SWORD_DEBUG_SPHERE_SIZE
 	sword_debug.mesh.radius = PLAYER_SWORD_DEBUG_SPHERE_SIZE * 2
 	material = StandardMaterial3D.new()
-	material.albedo_color = Color.PINK
+	material.albedo_color = Color.RED
 	material.flags_unshaded = true
 	sword_debug.mesh.surface_set_material(0, material)
 	player.mesh_instance.add_child(sword_debug)
@@ -103,7 +102,7 @@ func _ready() -> void:
 			var random_position = Vector3.ZERO
 			random_position.x = randi_range(-WRAP_X, WRAP_X)
 			random_position.z = randi_range(-WRAP_Z, WRAP_Z)
-			baddie_list.append(Character.new(random_position, BADDIE_RADIUS, Color.MAGENTA))
+			baddie_list.append(Character.new(random_position, BADDIE_RADIUS, Color.DIM_GRAY))
 	
 	camera = Camera3D.new()
 	camera.set_orthogonal(20.0, 1.0, 40.0)
@@ -131,7 +130,7 @@ func _process(_delta: float) -> void:
 
 	was_attacking = is_attacking
 
-	sword.transform.origin = Vector3(PLAYER_SWORD_LENGTH/2.0, 0.0, 0.0) # can i do this up top? or not until it is added to the scene?
+	sword.transform.origin = Vector3(PLAYER_SWORD_LENGTH/1.5, 0.0, 0.0) # can i do this up top? or not until it is added to the scene?
 
 	if sword_frame < PLAYER_SWORD_FRAMES:
 		sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, PLAYER_SWORD_ATTACK_ANGLE_INCREMENT)
@@ -140,10 +139,11 @@ func _process(_delta: float) -> void:
 		player.pos.z -= sin(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES)
 	else:
 		sword_pivot.transform = Transform3D.IDENTITY
-		sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, PLAYER_SWORD_IDLE_ANGLE)
+		#figure out how to tilt sword
+		#sword_pivot.transform = sword_pivot.transform.rotated(Vector3(0.2, 0.1, 0.2), 0.5*PI)
 		sword.hide()
 
-	if sword_frame == PLAYER_SWORD_FRAMES:
+	if sword_frame >= PLAYER_SWORD_FRAMES:
 		is_moving_left = Input.is_key_pressed(KEY_A)
 		if is_moving_left:
 			player.pos.x -= PLAYER_SPEED
@@ -187,10 +187,9 @@ func _process(_delta: float) -> void:
 
 		if b.hurt_frame > BADDIE_HURT_FRAMES && is_overlapping(b.pos, b.radius, sword_debug.global_transform.origin, PLAYER_SWORD_DEBUG_SPHERE_SIZE) && sword_frame < PLAYER_SWORD_FRAMES:
 			b.hurt_frame = 1
-			sword.scale = Vector3(randf_range(1.5, 1.9), randf_range(1.5, 2.5), randf_range(1.5, 2.5))
 			b.knockback_dir.x = b.pos.x - player.pos.x
 			b.knockback_dir.z = b.pos.z - player.pos.z
-			b.knockback_dir - b.knockback_dir.normalized()
+			b.knockback_dir = b.knockback_dir.normalized()
 			b.hp -= 1
 			b.speed *= -1.5
 
@@ -198,7 +197,7 @@ func _process(_delta: float) -> void:
 
 			match b.hurt_frame:
 				1:
-					b.mesh_instance.get_active_material(0).albedo_color = Color.MAGENTA
+					b.mesh_instance.get_active_material(0).albedo_color = Color.DIM_GRAY
 					b.mesh_instance.scale = Vector3(0.7, 0.7, 0.7)
 					b.pos += b.knockback_dir * -0.20
 					b.pos.x += randf_range(-0.07, 0.07)
@@ -219,14 +218,16 @@ func _process(_delta: float) -> void:
 					b.mesh_instance.scale = Vector3(1.2, 1.2, 1.2)
 					b.pos += b.knockback_dir * 0.10
 				5:
-					b.mesh_instance.get_active_material(0).albedo_color = Color.MAGENTA
+					b.mesh_instance.get_active_material(0).albedo_color = Color.DIM_GRAY
 					b.mesh_instance.scale = Vector3(1.1, 1.1, 1.1)
 					b.pos += b.knockback_dir * 0.05
 				_ when b.hurt_frame < BADDIE_HURT_FRAMES:
-					b.mesh_instance.get_active_material(0).albedo_color = Color.MAGENTA
+					b.mesh_instance.get_active_material(0).albedo_color = Color.DIM_GRAY
 					b.mesh_instance.scale = Vector3(1, 1, 1)
 					b.pos += b.knockback_dir * 0.025
 					if b.hp == 0:
+						b.pos = Vector3(999, 999, 999)
+						b.speed = 0
 						b.mesh_instance.hide()
 				_ when b.hurt_frame == BADDIE_HURT_FRAMES:
 					pass
@@ -235,3 +236,9 @@ func _process(_delta: float) -> void:
 			b.pos.x += b.seed * b.speed * sin(0.01 * frame + b.seed)
 
 		b.mesh_instance.transform.origin = b.pos
+
+		if b.hurt_frame > BADDIE_HURT_FRAMES && is_overlapping(b.pos, b.radius, player.pos, player.radius):
+			player.pos = Vector3.ZERO
+			player.theta = randf_range(-PI, PI)
+			# player.anim_data[hurt_frame] = 1
+			
