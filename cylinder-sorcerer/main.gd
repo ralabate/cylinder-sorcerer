@@ -3,11 +3,11 @@ extends Node3D
 const PLAYER_SPEED = 0.03
 const PLAYER_RADIUS = 0.5
 const PLAYER_SIZE = 1.0
-const PLAYER_ATTACK_ROOT_MOTION = 0.20
+const PLAYER_ATTACK_ROOT_MOTION = 0.40
 
-const PLAYER_SWORD_FRAMES = 11
-const PLAYER_SWORD_ATTACK_START_ANGLE = -PI/2.0
-const PLAYER_SWORD_ATTACK_ANGLE_INCREMENT = (PI - 0.05*2)/(PLAYER_SWORD_FRAMES - 2)
+const PLAYER_SWORD_FRAMES = 17
+const PLAYER_SWORD_ATTACK_START_ANGLE = -PI/2.0 - 0.5
+const PLAYER_SWORD_ATTACK_ANGLE_INCREMENT = 2*PI / PLAYER_SWORD_FRAMES
 const PLAYER_SWORD_LENGTH = 1.2
 const PLAYER_SWORD_DEBUG_SPHERE_SIZE = 0.15
 
@@ -135,16 +135,20 @@ func _process(_delta: float) -> void:
 	if sword_frame < PLAYER_SWORD_FRAMES:
 		sword.show()
 
-		sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, PLAYER_SWORD_ATTACK_ANGLE_INCREMENT)
-
-		if sword_frame == 1 or sword_frame == 2:
-			sword_pivot.transform = Transform3D.IDENTITY
-			sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, PLAYER_SWORD_ATTACK_START_ANGLE)
-		elif sword_frame == PLAYER_SWORD_FRAMES - 1:
-			pass
-		else:
-			player.pos.x += cos(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES)
-			player.pos.z -= sin(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES)
+		match sword_frame:
+			0:
+				pass # set up above, on impact
+			_ when sword_frame < 4:
+				sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, 0.5 * PLAYER_SWORD_ATTACK_ANGLE_INCREMENT)
+			_ when sword_frame < 7:
+				sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, 2 * PLAYER_SWORD_ATTACK_ANGLE_INCREMENT)
+				player.pos.x += cos(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES)
+				player.pos.z -= sin(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES)
+			_ when sword_frame < PLAYER_SWORD_FRAMES:
+				sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, 0.3 * PLAYER_SWORD_ATTACK_ANGLE_INCREMENT)
+				player.pos.x += cos(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES) * 0.4
+				player.pos.z -= sin(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES) * 0.4
+				
 	else:
 		sword_pivot.transform = Transform3D.IDENTITY
 		#figure out how to tilt sword
@@ -200,6 +204,7 @@ func _process(_delta: float) -> void:
 			b.knockback_dir = b.knockback_dir.normalized()
 			b.hp -= 1
 			b.speed *= -1.5
+			sword_frame = 0
 
 		if b.hurt_frame <= BADDIE_HURT_FRAMES:
 
@@ -245,7 +250,7 @@ func _process(_delta: float) -> void:
 
 		b.mesh_instance.transform.origin = b.pos
 
-		if b.hurt_frame > BADDIE_HURT_FRAMES && is_overlapping(b.pos, b.radius, player.pos, player.radius):
+		if b.hurt_frame > BADDIE_HURT_FRAMES && is_overlapping(b.pos, b.radius, player.pos, player.radius) and sword_frame > PLAYER_SWORD_FRAMES:
 			player.pos = Vector3.ZERO
 			player.theta = randf_range(-PI, PI)
 			# player.anim_data[hurt_frame] = 1
