@@ -17,7 +17,6 @@ const BADDIE_SPEED = 0.02
 const BADDIE_RADIUS = 0.5
 const BADDIE_HURT_FRAMES = 6
 const BADDIE_HP = 3
-const BADDIE_KNOCKBACK = 0.6
 
 const WRAP_X = 8
 const WRAP_Z = 8
@@ -50,6 +49,7 @@ class Character:
 	var hurt_frame: int
 	var hp: int
 	var seed: float
+	var knockback_dir: Vector3
 	
 	func _init(p_pos: Vector3, p_radius: float, p_color: Color):
 		self.pos = p_pos
@@ -184,39 +184,34 @@ func _process(_delta: float) -> void:
 		if b.hurt_frame > BADDIE_HURT_FRAMES && is_overlapping(b.pos, b.radius, sword_debug.global_transform.origin, PLAYER_SWORD_DEBUG_SPHERE_SIZE) && sword_frame < PLAYER_SWORD_FRAMES:
 			b.hurt_frame = 1
 			sword.scale = Vector3(randf_range(1.5, 1.9), randf_range(1.5, 2.5), randf_range(1.5, 2.5))
-			var knockback_dir: Vector3
-			knockback_dir.x = b.pos.x - player.pos.x
-			knockback_dir.z = b.pos.z - player.pos.z
-			b.pos += knockback_dir.normalized() * BADDIE_KNOCKBACK
+			b.knockback_dir.x = b.pos.x - player.pos.x
+			b.knockback_dir.z = b.pos.z - player.pos.z
+			b.knockback_dir - b.knockback_dir.normalized()
 
 		match b.hurt_frame:
 			1:
 				b.mesh_instance.get_active_material(0).albedo_color = Color.WHITE
-				b.mesh_instance.scale = Vector3(0.8 ,0.8, 0.8)
-				b.pos.x += randf_range(-0.09, 0.09)
-				b.pos.z += randf_range(-0.09, 0.09)
+				b.mesh_instance.scale = Vector3(1.5, 1.5, 1.5)
+				b.pos += b.knockback_dir * 0.25
 			2:
 				b.mesh_instance.get_active_material(0).albedo_color = Color.BLACK
-				b.mesh_instance.scale = Vector3(1.1, 1.1, 1.1)
-				b.pos.x += randf_range(-0.09, 0.09)
-				b.pos.z += randf_range(-0.09, 0.09)
+				b.mesh_instance.scale = Vector3(1.3, 1.3, 1.3)
+				b.pos += b.knockback_dir * 0.22
 			3:
 				b.mesh_instance.get_active_material(0).albedo_color = Color.BLACK
-				b.mesh_instance.scale = Vector3(1.15, 1.15, 1.15)
-				b.pos.x += randf_range(-0.09, 0.09)
-				b.pos.z += randf_range(-0.09, 0.09)
+				b.mesh_instance.scale = Vector3(1.2, 1.2, 1.2)
+				b.pos += b.knockback_dir * 0.20
 			4:
 				b.mesh_instance.get_active_material(0).albedo_color = Color.WHITE
-				b.mesh_instance.scale = Vector3(1.2, 1.2, 1.2)
-				b.pos.x += randf_range(-0.09, 0.09)
-				b.pos.z += randf_range(-0.09, 0.09)
-
+				b.mesh_instance.scale = Vector3(1.1, 1.1, 1.1)
+				b.pos += b.knockback_dir * 0.10
+			5:
+				b.mesh_instance.get_active_material(0).albedo_color = Color.WHITE
+				b.mesh_instance.scale = Vector3(1.1, 1.1, 1.1)
+				b.pos += b.knockback_dir * 0.05
 			_ when b.hurt_frame < BADDIE_HURT_FRAMES:
 				b.mesh_instance.get_active_material(0).albedo_color = Color.WHITE
 				b.mesh_instance.scale = Vector3(1, 1, 1)
-				b.pos.x += randf_range(-0.09, 0.09)
-				b.pos.z += randf_range(-0.09, 0.09)
-
 			_ when b.hurt_frame == BADDIE_HURT_FRAMES:
 				b.mesh_instance.get_active_material(0).albedo_color = Color.MAGENTA
 				b.mesh_instance.scale = Vector3(1, 1, 1)
@@ -224,6 +219,14 @@ func _process(_delta: float) -> void:
 				if b.hp == 0:
 					b.mesh_instance.hide()
 					sword_frame = PLAYER_SWORD_FRAMES
+
+		# DEBUG
+		# DEBUG
+		# DEBUG
+		b.mesh_instance.get_active_material(0).albedo_color = Color.MAGENTA
+		# DEBUG
+		# DEBUG
+		# DEBUG
 
 		if b.hurt_frame > BADDIE_HURT_FRAMES:
 			b.pos.x += b.seed * BADDIE_SPEED * sin(0.01 * frame + b.seed)
