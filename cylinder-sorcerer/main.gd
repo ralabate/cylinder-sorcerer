@@ -6,8 +6,8 @@ const PLAYER_SIZE = 1.0
 const PLAYER_ATTACK_ROOT_MOTION = 0.20
 
 const PLAYER_SWORD_FRAMES = 11
-const PLAYER_SWORD_ATTACK_START_ANGLE = -PI/2.0 + 0.2
-const PLAYER_SWORD_ATTACK_ANGLE_INCREMENT = (PI - 0.2*2)/PLAYER_SWORD_FRAMES
+const PLAYER_SWORD_ATTACK_START_ANGLE = -PI/2.0
+const PLAYER_SWORD_ATTACK_ANGLE_INCREMENT = (PI - 0.05*2)/(PLAYER_SWORD_FRAMES - 2)
 const PLAYER_SWORD_LENGTH = 1.2
 const PLAYER_SWORD_DEBUG_SPHERE_SIZE = 0.15
 
@@ -133,10 +133,18 @@ func _process(_delta: float) -> void:
 	sword.transform.origin = Vector3(PLAYER_SWORD_LENGTH/1.5, 0.0, 0.0) # can i do this up top? or not until it is added to the scene?
 
 	if sword_frame < PLAYER_SWORD_FRAMES:
-		sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, PLAYER_SWORD_ATTACK_ANGLE_INCREMENT)
 		sword.show()
-		player.pos.x += cos(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES)
-		player.pos.z -= sin(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES)
+
+		sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, PLAYER_SWORD_ATTACK_ANGLE_INCREMENT)
+
+		if sword_frame == 1 or sword_frame == 2:
+			sword_pivot.transform = Transform3D.IDENTITY
+			sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, PLAYER_SWORD_ATTACK_START_ANGLE)
+		elif sword_frame == PLAYER_SWORD_FRAMES - 1:
+			pass
+		else:
+			player.pos.x += cos(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES)
+			player.pos.z -= sin(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES)
 	else:
 		sword_pivot.transform = Transform3D.IDENTITY
 		#figure out how to tilt sword
