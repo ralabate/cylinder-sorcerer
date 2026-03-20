@@ -279,7 +279,8 @@ func _process(_delta: float) -> void:
 	if camera_shake_frame <= CAMERA_SHAKE_FRAMES:
 		camera.transform.origin.x = randf_range(-1.0, 1.0) * CAMERA_SHAKE_AMOUNT * (1.0 - float(camera_shake_frame)/CAMERA_SHAKE_FRAMES)
 		camera.transform.origin.z = randf_range(-1.0, 1.0) * CAMERA_SHAKE_AMOUNT * (1.0 - float(camera_shake_frame)/CAMERA_SHAKE_FRAMES)
+		var theta = randf_range(-PI, PI) * 0.03
+		camera.rotation_degrees.z += theta
 	else:
-		camera.transform.origin.x = 0
-		camera.transform.origin.z = 0
+		camera.look_at_from_position(Vector3(0, 20, 0), Vector3(0, 0, 0), Vector3(0, 0, -1))
 		
