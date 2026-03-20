@@ -1,6 +1,6 @@
 extends Node3D
 
-const PLAYER_SPEED = 0.03
+const PLAYER_SPEED = 0.06
 const PLAYER_RADIUS = 0.5
 const PLAYER_SIZE = 1.0
 const PLAYER_ATTACK_ROOT_MOTION = 1.0
@@ -15,7 +15,7 @@ const PLAYER_HP = 4
 const BADDIE_COUNT = 10
 const BADDIE_SPEED = 0.02
 const BADDIE_RADIUS = 0.7
-const BADDIE_HURT_FRAMES = 12
+const BADDIE_HURT_FRAMES = 14
 const BADDIE_HP = 3
 
 const CAMERA_SHAKE_FRAMES = BADDIE_HURT_FRAMES + 3
@@ -155,12 +155,10 @@ func _process(_delta: float) -> void:
 				sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, 1.7 * PLAYER_SWORD_ATTACK_ANGLE_INCREMENT)
 				player.pos.x += cos(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES)
 				player.pos.z -= sin(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES)
-				#sword.get_active_material(0).albedo_color = Color.WHITE
 			_ when sword_frame < PLAYER_SWORD_FRAMES:
 				sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, 0.45 * PLAYER_SWORD_ATTACK_ANGLE_INCREMENT)
 				player.pos.x += cos(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES) * 0.3
 				player.pos.z -= sin(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES) * 0.3
-				#sword.get_active_material(0).albedo_color = Color.YELLOW
 				
 	else:
 		sword_pivot.transform = Transform3D.IDENTITY
@@ -225,33 +223,33 @@ func _process(_delta: float) -> void:
 			match b.hurt_frame:
 				1:
 					b.mesh_instance.get_active_material(0).albedo_color = Color.DIM_GRAY
-					b.mesh_instance.scale = Vector3(0.7, 0.7, 0.7)
-					b.pos += b.knockback_dir * -0.20
+					b.mesh_instance.scale = Vector3(0.9, 0.9, 0.9)
+					b.pos += b.knockback_dir * -0.05
 					b.pos.x += randf_range(-1.0, 1.0) * 0.1
 					b.pos.z += randf_range(-1.0, 1.0) * 0.1
 
 				2:
 					b.mesh_instance.get_active_material(0).albedo_color = Color.WHITE
-					b.mesh_instance.scale = Vector3(0.9, 0.9, 0.9)
-					b.pos += b.knockback_dir * 0.50
+					b.mesh_instance.scale = Vector3(0.8, 0.8, 0.8)
+					b.pos += b.knockback_dir * -0.05
 					b.pos.x += randf_range(-1.0, 1.0) * 0.09
 					b.pos.z += randf_range(-1.0, 1.0) * 0.09
 				3:
 					b.mesh_instance.get_active_material(0).albedo_color = Color.WHITE
 					b.mesh_instance.scale = Vector3(1.35, 1.35, 1.35)
-					b.pos += b.knockback_dir * 0.20
+					b.pos += b.knockback_dir * 0.50
 					b.pos.x += randf_range(-1.0, 1.0) * 0.08
 					b.pos.z += randf_range(-1.0, 1.0) * 0.08
 				4:
 					b.mesh_instance.get_active_material(0).albedo_color = Color.WHITE
 					b.mesh_instance.scale = Vector3(1.2, 1.2, 1.2)
-					b.pos += b.knockback_dir * 0.10
+					b.pos += b.knockback_dir * 0.20
 					b.pos.x += randf_range(-1.0, 1.0) * 0.07
 					b.pos.z += randf_range(-1.0, 1.0) * 0.07
 				5:
 					b.mesh_instance.get_active_material(0).albedo_color = Color.DIM_GRAY
 					b.mesh_instance.scale = Vector3(1.1, 1.1, 1.1)
-					b.pos += b.knockback_dir * 0.07
+					b.pos += b.knockback_dir * 0.17
 					b.pos.x += randf_range(-1.0, 1.0) * 0.06
 					b.pos.z += randf_range(-1.0, 1.0) * 0.06
 				_ when b.hurt_frame < BADDIE_HURT_FRAMES:
