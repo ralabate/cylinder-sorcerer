@@ -11,6 +11,7 @@ const PLAYER_SWORD_ATTACK_ANGLE_INCREMENT = 2*PI / PLAYER_SWORD_FRAMES
 const PLAYER_SWORD_LENGTH = 1.2
 const PLAYER_SWORD_DEBUG_SPHERE_SIZE = 0.15
 const PLAYER_HP = 4
+const PLAYER_HURT_FRAMES = 10
 
 const BADDIE_COUNT = 10
 const BADDIE_SPEED = 0.02
@@ -57,7 +58,7 @@ class Character:
 	var knockback_dir: Vector3
 	var speed: float
 	
-	func _init(p_pos: Vector3, p_radius: float, p_color: Color, p_hp: int):
+	func _init(p_pos: Vector3, p_radius: float, p_color: Color, p_hp: int, p_hurt_frames: int):
 		self.pos = p_pos
 		self.theta = 0
 		self.radius = p_radius
@@ -70,7 +71,7 @@ class Character:
 		material.albedo_color = p_color
 		material.flags_unshaded = true
 		self.mesh_instance.mesh.surface_set_material(0, material)
-		self.hurt_frame = BADDIE_HURT_FRAMES + 1
+		self.hurt_frame = p_hurt_frames + 1
 		self.hp = p_hp
 		self.seed = randf_range(0.0, 1.0)
 		self.speed = BADDIE_SPEED
@@ -79,7 +80,7 @@ func is_overlapping(p1, r1, p2, r2):
 	return(p2.x - p1.x) * (p2.x - p1.x) + (p2.z - p1.z) * (p2.z - p1.z) < (r1 + r2) * (r1 + r2)
 
 func _ready() -> void:
-	player = Character.new(Vector3.ZERO, PLAYER_RADIUS, Color.DARK_OLIVE_GREEN, PLAYER_HP)
+	player = Character.new(Vector3.ZERO, PLAYER_RADIUS, Color.DARK_OLIVE_GREEN, PLAYER_HP, PLAYER_HURT_FRAMES)
 
 	sword_frame = PLAYER_SWORD_FRAMES + 1
 	sword = MeshInstance3D.new()
@@ -108,7 +109,7 @@ func _ready() -> void:
 			var random_position = Vector3.ZERO
 			random_position.x = randi_range(-WRAP_X, WRAP_X)
 			random_position.z = randi_range(-WRAP_Z, WRAP_Z)
-			baddie_list.append(Character.new(random_position, BADDIE_RADIUS, Color.DIM_GRAY, BADDIE_HP))
+			baddie_list.append(Character.new(random_position, BADDIE_RADIUS, Color.DIM_GRAY, BADDIE_HP, BADDIE_HURT_FRAMES))
 	
 	camera = Camera3D.new()
 	camera.set_orthogonal(20.0, 1.0, 40.0)
@@ -124,8 +125,6 @@ func _ready() -> void:
 	
 func _process(_delta: float) -> void:
 	frame = frame + 1
-	sword_frame = min(sword_frame + 1, PLAYER_SWORD_FRAMES)
-	camera_shake_frame += 1
 
 	is_attacking = Input.is_key_pressed(KEY_J)
 	if is_attacking && !was_attacking && sword_frame >= PLAYER_SWORD_FRAMES:
@@ -159,6 +158,8 @@ func _process(_delta: float) -> void:
 				sword_pivot.transform = sword_pivot.transform.rotated(Vector3.UP, 0.45 * PLAYER_SWORD_ATTACK_ANGLE_INCREMENT)
 				player.pos.x += cos(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES) * 0.3
 				player.pos.z -= sin(player.theta) * (PLAYER_ATTACK_ROOT_MOTION / PLAYER_SWORD_FRAMES) * 0.3
+
+		sword_frame = min(sword_frame + 1, PLAYER_SWORD_FRAMES)
 				
 	else:
 		sword_pivot.transform = Transform3D.IDENTITY
@@ -166,7 +167,7 @@ func _process(_delta: float) -> void:
 		#sword_pivot.transform = sword_pivot.transform.rotated(Vector3(0.2, 0.1, 0.2), 0.5*PI)
 		sword.hide()
 
-	if sword_frame >= PLAYER_SWORD_FRAMES:
+	if sword_frame >= PLAYER_SWORD_FRAMES and player.hurt_frame > PLAYER_HURT_FRAMES:
 		is_moving_left = Input.is_key_pressed(KEY_A)
 		if is_moving_left:
 			player.pos.x -= PLAYER_SPEED
@@ -187,13 +188,24 @@ func _process(_delta: float) -> void:
 			player.pos.z += PLAYER_SPEED
 			player.theta = -PI/2.0
 
+	if player.hurt_frame <= PLAYER_HURT_FRAMES:
+		match player.hurt_frame:
+			1:
+				player.pos += player.knockback_dir * 0.40
+			_ when player.hurt_frame <= PLAYER_HURT_FRAMES:
+				player.pos += player.knockback_dir * 0.05
+		if player.hurt_frame % 2 == 1:
+			player.mesh_instance.get_active_material(0).albedo_color = Color.WHITE
+		else:
+			player.mesh_instance.get_active_material(0).albedo_color = Color.DARK_OLIVE_GREEN
+		player.hurt_frame += 1
+
 	player.pos.x = clamp(player.pos.x, -WRAP_X, WRAP_X)
 	player.pos.z = clamp(player.pos.z, -WRAP_Z, WRAP_Z)
 			
 	player.mesh_instance.transform.origin = player.pos
 	var m1 = Basis.IDENTITY
 	player.mesh_instance.transform.basis = m1.rotated(Vector3.UP, player.theta)
-
 	var breathing_scale = 0.9 + 0.1 * abs(pow(sin(0.02 * frame), 3))
 	player.mesh_instance.scale = Vector3(breathing_scale, 1.0, breathing_scale)
 
@@ -268,17 +280,18 @@ func _process(_delta: float) -> void:
 
 		b.mesh_instance.transform.origin = b.pos
 
-		if b.hurt_frame > BADDIE_HURT_FRAMES && is_overlapping(b.pos, b.radius, player.pos, player.radius) and sword_frame > PLAYER_SWORD_FRAMES:
-			player.pos = Vector3.ZERO
-			player.theta = randf_range(-PI, PI)
+		if b.hurt_frame > BADDIE_HURT_FRAMES && is_overlapping(b.pos, b.radius, player.pos, player.radius):
+			player.hurt_frame = 1
+			player.knockback_dir.x = player.pos.x - b.pos.x
+			player.knockback_dir.z = player.pos.z - b.pos.z
+			player.knockback_dir = player.knockback_dir.normalized()
 			player.hp -= 1
-			
 
 	if camera_shake_frame <= CAMERA_SHAKE_FRAMES:
 		camera.transform.origin.x = randf_range(-1.0, 1.0) * CAMERA_SHAKE_AMOUNT * (1.0 - float(camera_shake_frame)/CAMERA_SHAKE_FRAMES)
 		camera.transform.origin.z = randf_range(-1.0, 1.0) * CAMERA_SHAKE_AMOUNT * (1.0 - float(camera_shake_frame)/CAMERA_SHAKE_FRAMES)
 		var theta = randf_range(-PI, PI) * 0.03
 		camera.rotation_degrees.z += theta
+		camera_shake_frame += 1
 	else:
 		camera.look_at_from_position(Vector3(0, 20, 0), Vector3(0, 0, 0), Vector3(0, 0, -1))
-		
