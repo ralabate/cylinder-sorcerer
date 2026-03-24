@@ -1,10 +1,13 @@
 extends Node3D
 
+const DUNGEON_COLOR = Color.BLACK
+
+const PLAYER_CAMERA_SHAKE_AMOUNT = 0.70
 const PLAYER_COLOR = Color.DARK_OLIVE_GREEN
 const PLAYER_HP = 4
 const PLAYER_NUM_HURT_FRAMES = 12
 const PLAYER_RADIUS = 0.5
-const PLAYER_SPEED = 0.04
+const PLAYER_SPEED = 0.05
 
 const PLAYER_SWORD_ROOT_MOTION = 2.5
 const PLAYER_NUM_SWORD_FRAMES = 20
@@ -15,22 +18,23 @@ const PLAYER_SWORD_DEBUG_SPHERE_SIZE = 0.13
 
 const SKULL_COUNT = 10
 
+const SKULL_CAMERA_SHAKE_AMOUNT = 0.45
 const SKULL_COLOR = Color.DIM_GRAY
 const SKULL_HP = 3
 const SKULL_NUM_HURT_FRAMES = 14
 const SKULL_RADIUS = 1.0
 const SKULL_SPEED = 0.02
 
-const BAT_COUNT = 20
+const BAT_COUNT = 10
 
-const BAT_COLOR = Color.BLACK
+const BAT_CAMERA_SHAKE_AMOUNT = 0.15
+const BAT_COLOR = Color.BROWN
 const BAT_HP = 1
 const BAT_NUM_HURT_FRAMES = 14
 const BAT_RADIUS = 0.2
 const BAT_SPEED = 0.01
 
 const CAMERA_SHAKE_FRAMES = SKULL_NUM_HURT_FRAMES * 2.0
-const CAMERA_SHAKE_AMOUNT = 0.35
 
 const WRAP_X = 17
 const WRAP_Z = 9
@@ -44,7 +48,7 @@ enum Direction {
 }
 
 var input_bit_field: int
-var input_bit_field_previous_frame: int # AFTER FOUR-WAY
+var input_bit_field_previous_frame: int
 var was_attacking: bool
 var is_attacking: bool
 
@@ -58,13 +62,16 @@ var sword_pivot: Node3D
 var sword: MeshInstance3D
 var sword_debug: MeshInstance3D
 var camera: Camera3D	
+var camera_shake_amount: float
 
 class Actor:
 	var behavior_func
+	var camera_shake_amount: float
 	var color: Color
 	var dir: Vector3i
 	var hp: int
 	var hurt_frame: int
+	var is_dead: bool
 	var knockback_dir: Vector3
 	var mesh_instance: MeshInstance3D
 	var num_hurt_frames: int
@@ -75,15 +82,18 @@ class Actor:
 	
 	func _init(p_breed: Breed):
 		self.behavior_func = p_breed.behavior_func
+		self.camera_shake_amount = p_breed.camera_shake_amount
+		self.color = p_breed.color
 		self.dir = Vector3i(0, 0, 0)
 		self.hp = p_breed.hp
 		self.hurt_frame = p_breed.num_hurt_frames + 1
+		self.is_dead = false
 		self.mesh_instance = MeshInstance3D.new()
 		self.mesh_instance.mesh = SphereMesh.new()
 		self.mesh_instance.mesh.height = 2.0 * p_breed.radius
 		self.mesh_instance.mesh.radius = p_breed.radius
 		var material = StandardMaterial3D.new()
-		material.albedo_color = p_breed.color
+		material.albedo_color = self.color
 		material.flags_unshaded = true
 		self.mesh_instance.mesh.surface_set_material(0, material)
 		self.num_hurt_frames = p_breed.num_hurt_frames
@@ -97,14 +107,16 @@ class Actor:
 
 class Breed:
 	var behavior_func
+	var camera_shake_amount: float
 	var color: Color
 	var hp: int
 	var num_hurt_frames: int
 	var radius: float
 	var speed: float
 
-	func _init(p_behavior_func, p_color: Color, p_hp: int, p_num_hurt_frames: int, p_radius: float, p_speed: float):
+	func _init(p_behavior_func, p_camera_shake_amount: float, p_color: Color, p_hp: int, p_num_hurt_frames: int, p_radius: float, p_speed: float):
 		self.behavior_func = p_behavior_func
+		self.camera_shake_amount = p_camera_shake_amount
 		self.color = p_color
 		self.hp = p_hp
 		self.num_hurt_frames = p_num_hurt_frames
@@ -112,13 +124,15 @@ class Breed:
 		self.speed = p_speed
 
 func behavior_func_seek(p_a: Actor, p_player_pos: Vector3):
+	if player.is_dead:
+		return
 	var dir: Vector3
 	dir.x = p_player_pos.x - p_a.pos.x
 	dir.z = p_player_pos.z - p_a.pos.z
 	p_a.pos += dir.normalized() * p_a.speed
 
 func behavior_func_wander(p_a: Actor, p_player_pos: Vector3):
-	p_a.pos.x += p_a.speed * sin(0.01 * frame + p_a.seed)
+	p_a.pos.x += p_a.speed * sin(0.01 * frame + 100*p_a.seed)
 
 func behavior_func_wander_then_seek(p_a: Actor, p_player_pos: Vector3):
 	if p_a.hp <= 1:
@@ -132,9 +146,9 @@ func is_overlapping(p1, r1, p2, r2):
 	return(p2.x - p1.x) * (p2.x - p1.x) + (p2.z - p1.z) * (p2.z - p1.z) < (r1 + r2) * (r1 + r2)
 
 func _ready() -> void:
-	#RenderingServer.set_default_clear_color(Color(0.1, 0.1, 0.1))
+	RenderingServer.set_default_clear_color(DUNGEON_COLOR)
 
-	var player_breed = Breed.new(behavior_func_seek, PLAYER_COLOR, PLAYER_HP, PLAYER_NUM_HURT_FRAMES, PLAYER_RADIUS, PLAYER_SPEED)
+	var player_breed = Breed.new(behavior_func_seek, PLAYER_CAMERA_SHAKE_AMOUNT, PLAYER_COLOR, PLAYER_HP, PLAYER_NUM_HURT_FRAMES, PLAYER_RADIUS, PLAYER_SPEED)
 	player = Actor.new(player_breed)
 	player.pos = Vector3(0, 0, 0*WRAP_Z)
 
@@ -162,11 +176,11 @@ func _ready() -> void:
 	player.mesh_instance.add_child(sword_debug)
 	sword_debug.visible = false
 
-	var skull_breed = Breed.new(behavior_func_wander_then_seek, SKULL_COLOR, SKULL_HP, SKULL_NUM_HURT_FRAMES, SKULL_RADIUS, SKULL_SPEED)
+	var skull_breed = Breed.new(behavior_func_wander_then_seek, SKULL_CAMERA_SHAKE_AMOUNT, SKULL_COLOR, SKULL_HP, SKULL_NUM_HURT_FRAMES, SKULL_RADIUS, SKULL_SPEED)
 	for i in SKULL_COUNT:
 			baddie_list.append(Actor.new(skull_breed))
 
-	var bat_breed = Breed.new(behavior_func_seek, BAT_COLOR, BAT_HP, BAT_NUM_HURT_FRAMES, BAT_RADIUS, BAT_SPEED)
+	var bat_breed = Breed.new(behavior_func_seek, BAT_CAMERA_SHAKE_AMOUNT, BAT_COLOR, BAT_HP, BAT_NUM_HURT_FRAMES, BAT_RADIUS, BAT_SPEED)
 	for i in BAT_COUNT:
 			baddie_list.append(Actor.new(bat_breed))
 
@@ -212,7 +226,9 @@ func _process(_delta: float) -> void:
 			input_bit_field ^= Direction.DOWN
 			tmp_dir.z += 1
 
-		player.pos += PLAYER_SPEED * tmp_dir
+		var normalized_tmp_dir: Vector3 = tmp_dir
+		normalized_tmp_dir = normalized_tmp_dir.normalized()
+		player.pos += PLAYER_SPEED * normalized_tmp_dir
 
 		if tmp_dir != Vector3i.ZERO:
 			player.dir = tmp_dir
@@ -224,14 +240,14 @@ func _process(_delta: float) -> void:
 			_ when player.hurt_frame < player.num_hurt_frames:
 				player.pos += player.knockback_dir * 0.05
 				if player.hurt_frame % 2 == 0:
-					RenderingServer.set_default_clear_color(Color.BLACK)
+					RenderingServer.set_default_clear_color(DUNGEON_COLOR)
 					player.mesh_instance.get_active_material(0).albedo_color = Color.WHITE
 				else:
 					RenderingServer.set_default_clear_color(Color.RED)
 					player.mesh_instance.get_active_material(0).albedo_color = Color.BLACK
 			_ when player.hurt_frame == player.num_hurt_frames:
 				player.mesh_instance.get_active_material(0).albedo_color = Color.DARK_OLIVE_GREEN
-				RenderingServer.set_default_clear_color(Color(0.1, 0.1, 0.1))
+				RenderingServer.set_default_clear_color(DUNGEON_COLOR)
 
 
 		player.hurt_frame += 1
@@ -305,6 +321,7 @@ func _process(_delta: float) -> void:
 			b.knockback_dir = b.knockback_dir.normalized()
 			b.hp -= 1
 			if b.hp == 0:
+				camera_shake_amount = b.camera_shake_amount
 				camera_shake_frame = 1
 			b.speed *= -1
 
@@ -312,7 +329,7 @@ func _process(_delta: float) -> void:
 
 			match b.hurt_frame:
 				1:
-					b.mesh_instance.get_active_material(0).albedo_color = Color.SIENNA
+					b.mesh_instance.get_active_material(0).albedo_color = b.color
 					b.mesh_instance.scale = Vector3(0.9, 0.9, 0.9)
 					b.pos += b.knockback_dir * -0.05
 					b.pos.x += randf_range(-1.0, 1.0) * 0.1
@@ -337,13 +354,13 @@ func _process(_delta: float) -> void:
 					b.pos.x += randf_range(-1.0, 1.0) * 0.07
 					b.pos.z += randf_range(-1.0, 1.0) * 0.07
 				5:
-					b.mesh_instance.get_active_material(0).albedo_color = Color.SIENNA
+					b.mesh_instance.get_active_material(0).albedo_color = b.color
 					b.mesh_instance.scale = Vector3(1.1, 1.1, 1.1)
 					b.pos += b.knockback_dir * 0.22
 					b.pos.x += randf_range(-1.0, 1.0) * 0.06
 					b.pos.z += randf_range(-1.0, 1.0) * 0.06
 				_ when b.hurt_frame < b.num_hurt_frames:
-					b.mesh_instance.get_active_material(0).albedo_color = Color.SIENNA
+					b.mesh_instance.get_active_material(0).albedo_color = b.color
 					b.mesh_instance.scale = Vector3(1, 1, 1)
 					b.pos.x += randf_range(-1.0, 1.0) * 0.01
 					b.pos.z += randf_range(-1.0, 1.0) * 0.01
@@ -352,6 +369,8 @@ func _process(_delta: float) -> void:
 						b.pos = Vector3(999, 999, 999)
 						b.speed = 0
 						b.mesh_instance.hide()
+				_ when b.hurt_frame == b.num_hurt_frames:
+					b.mesh_instance.get_active_material(0).albedo_color = b.color
 
 		b.behavior_func.call(b, player.pos)
 
@@ -363,11 +382,16 @@ func _process(_delta: float) -> void:
 			player.knockback_dir.z = player.pos.z - b.pos.z
 			player.knockback_dir = player.knockback_dir.normalized()
 			player.hp -= 1
+			if (player.hp <= 0):
+				pass
+				#player.is_dead = true
+				#player.mesh_instance.hide()
+			camera_shake_amount = player.camera_shake_amount
 			camera_shake_frame = 1
 
 	if camera_shake_frame <= CAMERA_SHAKE_FRAMES:
-		camera.transform.origin.x = randf_range(-1.0, 1.0) * CAMERA_SHAKE_AMOUNT * (1.0 - float(camera_shake_frame)/CAMERA_SHAKE_FRAMES)
-		camera.transform.origin.z = randf_range(-1.0, 1.0) * CAMERA_SHAKE_AMOUNT * (1.0 - float(camera_shake_frame)/CAMERA_SHAKE_FRAMES)
+		camera.transform.origin.x = randf_range(-1.0, 1.0) * camera_shake_amount * (1.0 - float(camera_shake_frame)/CAMERA_SHAKE_FRAMES)
+		camera.transform.origin.z = randf_range(-1.0, 1.0) * camera_shake_amount * (1.0 - float(camera_shake_frame)/CAMERA_SHAKE_FRAMES)
 		var camera_theta = randf_range(-PI, PI) * 0.02
 		camera.rotation_degrees.z += camera_theta
 		camera_shake_frame += 1
